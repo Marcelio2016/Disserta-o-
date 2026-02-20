@@ -13,6 +13,8 @@ import json
 from dataclasses import dataclass
 # Classe Path para manipular caminhos de arquivos de forma robusta.
 from pathlib import Path
+# Ferramentas padrão para download de arquivo via URL (Google Drive).
+from urllib.request import urlretrieve
 # Tipo Any para funções que recebem objetos diversos.
 from typing import Any
 
@@ -67,6 +69,12 @@ from catboost import CatBoostClassifier
 
 # Nome da variável-alvo esperada no dataset.
 TARGET_COLUMN = "Churn"
+# ID do arquivo da base no Google Drive informado pelo usuário.
+DEFAULT_GDRIVE_FILE_ID = "1prLfR_9W5WDeCg7KFWj7ZJrbzZMWOkV-"
+# URL direta de download do Google Drive construída com o file_id.
+DEFAULT_GDRIVE_DOWNLOAD_URL = f"https://drive.google.com/uc?export=download&id={DEFAULT_GDRIVE_FILE_ID}"
+# Caminho padrão local para salvar a base quando o usuário não passa --data.
+DEFAULT_LOCAL_DATA_PATH = Path("data") / "Telco-Customer-Churn.csv"
 
 
 # =================================================
@@ -208,6 +216,24 @@ class EvaluationResult:
 # ============================================
 # SEÇÃO 5 - CARGA E PRÉ-PROCESSAMENTO DE DADOS
 # ============================================
+
+# Resolve caminho da base: usa --data quando informado ou baixa automaticamente do Google Drive.
+def resolve_data_path(data_arg: str | None) -> Path:
+    # Se usuário passou --data, usa esse caminho diretamente.
+    if data_arg:
+        return Path(data_arg)
+
+    # Se o arquivo padrão já existir localmente, reaproveita sem novo download.
+    if DEFAULT_LOCAL_DATA_PATH.exists():
+        return DEFAULT_LOCAL_DATA_PATH
+
+    # Garante que a pasta de destino exista antes de baixar.
+    DEFAULT_LOCAL_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # Faz download da base a partir do Google Drive para o caminho padrão local.
+    urlretrieve(DEFAULT_GDRIVE_DOWNLOAD_URL, DEFAULT_LOCAL_DATA_PATH)
+    # Retorna caminho local pronto para leitura do CSV.
+    return DEFAULT_LOCAL_DATA_PATH
+
 
 def load_data(path: str) -> tuple[pd.DataFrame, pd.Series]:
     # Lê CSV informado pelo usuário no argumento --data.
@@ -536,7 +562,7 @@ def main() -> None:
     # Cria parser de argumentos CLI.
     parser = argparse.ArgumentParser(description="Pipeline de dissertação para predição de churn")
     # Argumento obrigatório com caminho do CSV.
-    parser.add_argument("--data", required=True, help="Caminho para CSV da base Telco Customer Churn")
+    parser.add_argument("--data", required=False, help="Caminho para CSV da base Telco Customer Churn")
     # Argumento opcional para diretório de saída.
     parser.add_argument("--output-dir", default="output", help="Diretório de saída para relatórios")
     # Faz parsing dos argumentos passados pelo usuário.
@@ -547,7 +573,9 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Carrega dados de entrada.
-    X, y = load_data(args.data)
+    resolved_data_path = resolve_data_path(args.data)
+    # Carrega dados de entrada do caminho resolvido (local informado ou Google Drive).
+    X, y = load_data(str(resolved_data_path))
     # Treina, valida e compara modelos.
     results, fitted_pipelines, split = evaluate_models(X, y)
     # Recupera partições para etapa de explicabilidade.
@@ -582,6 +610,8 @@ def main() -> None:
 
     # Feedback de conclusão para terminal.
     print("Execução concluída.")
+    # Mostra o caminho da base efetivamente utilizada na execução.
+    print(f"Base utilizada: {resolved_data_path.resolve()}")
     # Informa melhor modelo por F1 de teste.
     print(f"Melhor modelo (F1 teste): {best_name}")
     # Informa caminho absoluto dos relatórios gerados.

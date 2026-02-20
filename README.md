@@ -24,6 +24,8 @@ Este repositório implementa uma pipeline completa em Python para executar a met
 ```bash
 python -m pip install -r requirements.txt
 python src/churn_dissertation_pipeline.py --data /caminho/Telco-Customer-Churn.csv --output-dir output
+# OU (sem --data): baixa automaticamente da URL padrão do Google Drive
+python src/churn_dissertation_pipeline.py --output-dir output
 ```
 
 ## Saídas
@@ -37,3 +39,4 @@ python src/churn_dissertation_pipeline.py --data /caminho/Telco-Customer-Churn.c
 - A coluna alvo esperada é `Churn` (com valores `Yes`/`No`).
 - A coluna `customerID` é removida automaticamente.
 - Quando SHAP/LIME não estiverem disponíveis no ambiente, o erro é registrado no relatório sem interromper a execução.
+- Se `--data` não for informado, o script usa o `file_id` padrão (`1prLfR_9W5WDeCg7KFWj7ZJrbzZMWOkV-`) e baixa automaticamente para `data/Telco-Customer-Churn.csv`.
